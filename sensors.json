@@ -1,20 +1,22 @@
 { "sensores" : 
-	[
+	{ 
+		"d1": 
 		{
-			"device": "d1",
 			"name": "SAI temp-humedad",
-			"source": "EMON",
+			"source": "EMONCMS",
 			"ubicacion": "SAI-room",
 			"url": "http://emoncms.org/feed/value.json?apikey=c9886a19517e76ee466a0a658a434c78&id=54037",
-			"units": "ºC"
+			"units": "ºC",
+			"period": "30"
 		},
+		"devSalon":
 		{
-			"device": "d2",
 			"name": "Sala reuniones",
-			"source": "R-DB",
+			"source": "RETHINK",
 			"ubicacion": "RoboLab",
 			"url": "",
-			"units": "ºC"
+			"units": "ºC",
+			"table": "devSalon"
 		}
-	]
+	}
 }
