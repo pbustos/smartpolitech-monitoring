@@ -7,7 +7,7 @@
 			"ubicacion": "SAI-room",
 			"url": "http://emoncms.org/feed/value.json?apikey=c9886a19517e76ee466a0a658a434c78&id=54037",
 			"units": "ºC",
-			"period": "30"
+			"period": "10000"
 		},
 		"devSalon":
 		{

@@ -24,7 +24,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 	def __init__(self):
 		super(MainWindow, self).__init__()
 		self.setupUi(self)
-		
+		global sensors
 		#read sensor's configuration file
 		sensorFile = self.readJSONFile("sensors.json")
 		sensors = sensorFile["sensores"]
@@ -33,22 +33,21 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 			if s["source"] == "RETHINK":
 				s["thread"] = RDBReader(str(name), s["table"])
 				s["thread"].signalVal.connect(self.slotFromReader)
-				s["timer"] = Timer(1000, name)
+				s["timer"] = Timer(name, 1000)
 				s["timer"].timeout.connect(self.slotCountDown)
 				s["countdown"] = 0
 				s["row"] = r
 				r=r+1
 			
-				
-			#if s["source"] == "EMONCMS":
-				#s["thread"] = RESTReader(name, s["url"], s["period"])
-				#s["thread"].signalVal.connect(self.slotFromReader)
-				#s["timer"] = Timer(1000, name)
-				#s["timer"].timeout.connect(self.slotCountDown)
-				#s["countdown"] = 0
-				#s["row"] = r
-				#r = r+1
-				
+			if s["source"] == "EMONCMS":
+				s["thread"] = RESTReader(name, s["url"], s["period"])
+				s["thread"].signalVal.connect(self.slotFromReader)
+				s["timer"] = Timer(name, 1000)
+				s["timer"].timeout.connect(self.slotCountDown)
+				s["countdown"] = 0
+				s["row"] = r
+				r = r+1
+		
 		#create UI table
 		self.createTable(self.tableWidget)
 		self.setTableRows(sensors, self.tableWidget)
@@ -56,10 +55,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 		self.show()
 		
 		#Start threads
-		sensors["devSalon"]["thread"].start()	
-	#	[ s["thread"].start() for s in sensors.values() ]
-	#	[ s["timer"].start() for s in sensors.values() ]
-
+		[ s["thread"].start() for s in sensors.values() ]
+		[ s["timer"].start() for s in sensors.values() ]
 		
 	def readJSONFile(self, fileName, imprimir = False):
 		with open(fileName, 'r') as fileJson:
@@ -206,12 +203,14 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 		font.setPointSize(10)
 		font.setBold(True)
 		
-		sensors[ident]["countdown"] = sensors[ident]["countdown"] + 1
+		sensors[ident]["countdown"] += 1
+		print "slotcountdown", ident, sensors[ident]["row"], sensors[ident]["countdown"] 
 		item = QTableWidgetItem(str(sensors[ident]["countdown"]))
 		item.setTextAlignment(Qt.AlignCenter)
 		item.setBackground(brushB)
 		item.setForeground(brushF)
 		item.setFont(font)
+		print "slotcountdown", ident, sensors[ident]["row"], sensors[ident]["countdown"] 
 		self.tableWidget.setItem( sensors[ident]["row"], 4, item)
 		
 	@Slot(str,dict)
@@ -229,30 +228,29 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 		item.setBackground(brushB)
 		item.setForeground(brushF)
 		item.setFont(font)
-		print sensors
-		print ident
 		self.tableWidget.setItem(sensors[ident]["row"], 5, item)
 				
-	
-	def compute(self):
-		pass
-				
 
-class Timer(QThread):
+class Timer(QObject):
 	timeout = Signal( str )
-	def __init__(self, period, ident):
-		super(Timer,self).__init__()
+	def __init__(self, ident, period):	#milliseconds
+		super(Timer,self).__init__()  
 		self.ident = ident
-		self.period = period
+		self.period =period
+
+	def start(self):
+		try:
+			self.timeout.emit(self.ident)
+			print "timer", self.ident
+		finally:
+			QTimer.singleShot(self.period, self.start)
 		
-	def run(self):
-		time.sleep(self.period*0.001)
-		self.timeout.emit(self.ident)
 
 class RDBReader(QThread):
 	signalVal = Signal( str, dict )
 	def __init__(self, ident, table):
 		super(RDBReader, self).__init__()
+		
 		ioloop.IOLoop.current().add_callback(self.print_changes)
 		rdb.set_loop_type('tornado')
 		self.ident = ident
@@ -260,31 +258,34 @@ class RDBReader(QThread):
 		
 	@gen.coroutine
 	def print_changes(self):
-		print "thread"
-		conn = yield rdb.connect(host="azure",port=28015,db="cyber")
+		conn = yield rdb.connect(host="191.233.97.19",port=28015,db="cyber")
 		feed = yield rdb.table(self.table).changes().run(conn)
 		while (yield feed.fetch_next()):
 			change = yield feed.next()
-			count = 0
+			print "en thread", sensors[self.ident]["countdown"]
+			sensors[self.ident]["countdown"]  = 0
 			self.signalVal.emit(self.ident, change["new_val"]["temp"][0:4])
-		
+			print "RDBReader", change["new_val"]["temp"][0:4]
+			
 	def run(self):
 		ioloop.IOLoop.current().start()
 		
-class RESTReader(QThread):
+class RESTReader(QObject):
 	signalVal = Signal( str, dict )
 	def __init__(self, ident, url, period):
-		super(RESTReader, self).__init__()
+		super(RESTReader,self).__init__()
 		self.ident = ident
 		self.url = url
 		self.period = period
 		
-	def run(self):
-		f = requests.get(self.url)	
-		#sensors[self.ident]["countdown"] = 0
-		self.signalVal.emit( self.ident, f.text[1:-1] )
-		time.sleep( float(self.period) )
-		
+	def start(self):
+		try:
+			f = requests.get(self.url)	
+			sensors[self.ident]["countdown"] = 0
+			self.signalVal.emit( self.ident, f.text[1:-1] )
+			print "rest reader", f.text[1:-1]
+		finally:
+			 QTimer.singleShot(int(self.period), self.start)
 		
 if __name__ == '__main__':
 	app = QApplication(sys.argv)
