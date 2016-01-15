@@ -245,7 +245,7 @@ class Timer(QObject):
 		finally:
 			QTimer.singleShot(self.period, self.start)
 		
-
+#Reader for RethinkDB based sensors
 class RDBReader(QThread):
 	signalVal = Signal( str, dict )
 	def __init__(self, ident, table):
@@ -270,6 +270,7 @@ class RDBReader(QThread):
 	def run(self):
 		ioloop.IOLoop.current().start()
 		
+#Reader for REST sensors
 class RESTReader(QObject):
 	signalVal = Signal( str, dict )
 	def __init__(self, ident, url, period):

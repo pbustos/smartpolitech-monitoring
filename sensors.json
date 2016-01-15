@@ -17,6 +17,15 @@
 			"url": "",
 			"units": "ºC",
 			"table": "devSalon"
+		},
+		"devSalon2":
+		{
+			"name": "Sala reuniones2",
+			"source": "RETHINK",
+			"ubicacion": "RoboLab",
+			"url": "",
+			"units": "ºC",
+			"table": "devSalon"
 		}
 	}
 }
