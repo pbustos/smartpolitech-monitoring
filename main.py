@@ -210,7 +210,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 		item.setBackground(brushB)
 		item.setForeground(brushF)
 		item.setFont(font)
-		print "slotcountdown", ident, sensors[ident]["row"], sensors[ident]["countdown"] 
+		#print "slotcountdown", ident, sensors[ident]["row"], sensors[ident]["countdown"] 
 		self.tableWidget.setItem( sensors[ident]["row"], 4, item)
 		
 	@Slot(str,dict)
