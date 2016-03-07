@@ -1,0 +1,31 @@
+{ "sensores" : 
+	{ 
+		"RAY-fake":
+		{
+			"name": "RAY-fake",
+			"source": "RETHINK",
+			"ubicacion": "RoboLab",
+			"table": "D49749f20559e46e2b251a198c4cb708b",
+			"canales": [{"name":"temperatura","units": "ºC"},{"name": "humedad","units": "%"},{"name": "CO2","units": "ppm"}]
+		},
+		"RAY-RoboLab":
+		{
+			"name": "RAY-RoboLab",
+			"source": "RETHINK",
+			"ubicacion": "RoboLab",
+			"table": "De0507f7c2e9041a38e74eb74c6da5e21",
+			"canales": [{"name":"temperatura","units": "ºC"},{"name": "humedad","units": "%"},{"name": "CO2","units": "ppm"}]
+		},
+		"SAI - temp":
+		{
+			"name": "SAI-temp",
+			"source": "RETHINK",
+			"ubicacion": "RoboLab",
+			"table": "D7fddae8e897711e0bc11003048c3b1f2",
+			"canales": [{"name":"temperatura","units": "ºC"},{"name": "humedad","units": "%"},{"name": "windows","units": "I/O"}]
+		}
+		
+	}
+}
+
+
