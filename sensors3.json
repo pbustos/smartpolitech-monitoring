@@ -22,7 +22,7 @@
 			"source": "RETHINK",
 			"ubicacion": "RoboLab",
 			"table": "D7fddae8e897711e0bc11003048c3b1f2",
-			"canales": [{"name":"temperatura","units": "ºC"},{"name": "humedad","units": "%"},{"name": "windows","units": "I/O"}]
+			"canales": [{"name":"temperatura","units": "ºC"},{"name": "humedad","units": "%"},{"name": "windows","units": "I/O"},{"name":"vbat","units":"V"}]
 		}
 		
 	}

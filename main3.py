@@ -1,9 +1,7 @@
 ## Monitoring system for SmartPoliTech
 ##
-import sys
-import json
+import sys, json, requests, json, time, threading, pprint
 sys.path.append('/usr/local/lib/python2.7/site-packages')
-import requests, json, time
 import numpy as np
 from collections import deque
 from PySide.QtCore import *
@@ -15,7 +13,6 @@ from subprocess import call
 import rethinkdb as rdb
 import datetime as dt
 from tornado import ioloop, gen
-import threading
 
 # Generate GUI form .ui file
 call("pyside-uic smartsensors.ui > ui_smartsensors.py", shell=True)
@@ -32,254 +29,100 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 		global sensors
 		global row	
 
-		self.readFromDB()
-
-		#read sensor's configuration file
-		sensorFile = self.readJSONFile("sensors3.json")
-		sensors = sensorFile["sensores"]
-		r=4
-		row=2   #para calcular el numero de filas de forma dinamica
-		for name,s in sensors.iteritems():
-			if s["source"] == "RETHINK":
-				s["thread"] = RDBReader(str(name), s["table"])
-				s["thread"].signalVal.connect(self.slotFromReader)
-				s["timer"] = Timer(name, 1000)
-				s["timer"].timeout.connect(self.slotCountDown)
-				s["countdown"] = 0
-				for i in range(0,len(s["canales"])):				
-					s["row"+str(i)] = r
-					r=r+1
-					
-					row=row + len(s["canales"]) +2 
-				r=r+2
+		self.conn = rdb.connect(host="158.49.247.193",port=28015,db="SmartPoliTech",auth_key="smartpolitech2")
+		devices = rdb.table("Dispositivos").run(self.conn)
+		pp = pprint.PrettyPrinter(indent=4)
+		for device in devices:
+			ide = device["id"]
+			sensors[ide] = device
+			table = "D"+ide.replace("-","")
+			sensors[ide]["table"] = table
+			ndatos = rdb.table(table).count().run(self.conn)
+			if ndatos > 0:
+				datos = rdb.table(table).max("date").run(self.conn)
+				sensors[ide]["canales"]= datos["sensors"]
+			sensors[ide]["thread"] = RDBReader(ide, table)
+			sensors[ide]["thread"].signalVal.connect(self.slotFromReader)
+			sensors[ide]["timer"] = Timer(ide, 1000)
+			sensors[ide]["timer"].timeout.connect(self.slotCountDown)
+			sensors[ide]["updated"] = 0
 			
-		
-			if s["source"] == "EMONCMS":
-				s["thread"] = RESTReader(name, s["url"], s["period"])
-				s["thread"].signalVal.connect(self.slotFromReader)
-				s["timer"] = Timer(name, 1000)
-				s["timer"].timeout.connect(self.slotCountDown)
-				s["countdown"] = 0
-				s["row"] = r
-				r = r+1
+		print "Tree -----------------------"
+		pp = pprint.PrettyPrinter(indent=4)
+		pp.pprint(sensors)
+		print "-----------------------"
 		
 		#create UI table
-		self.createTable(self.tableWidget,sensors)
-		#self.setTableRows(sensors, self.tableWidget)
-		
+		self.createTable(self.tableWidget, sensors)
 		self.show()
 		
 		#Start threads
-		[ s["thread"].start() for s in sensors.values() ]
+		#[ s["thread"].start() for s in sensors.values() ]
 		[ s["timer"].start() for s in sensors.values() ]
 	
-
-	#read for RTDB devices
-	def readFromDB(self):
-		conn = rdb.connect(host="158.49.247.193",port=28015,db="SmartPoliTech",auth_key="smartpolitech2")
-		devices = rdb.table("Dispositivos").run(conn)
-		for device in devices:
-			print device["description"], device["id"]
-
-
-	def readJSONFile(self, fileName, imprimir = False):
-		with open(fileName, 'r') as fileJson:
-			data = json.load(fileJson)
-                if imprimir == True:
-                    pprint(data)
-		return data
-
-	def createTable(self, tableView,sensors):
-
-		itera=2 #para iterar y numero de fila
-		
-
-		tableView.setRowCount(row);
-		tableView.setColumnCount(6);
+	def createTable(self, tableView, sensors):
+		itera=0
+		tableView.setColumnCount(3);
 		tableView.horizontalHeader().hide()
 		tableView.verticalHeader().hide()
 		tableView.setWordWrap(True)
 		tableView.setTextElideMode(Qt.ElideNone)
 		tableView.setShowGrid(False)
-		
-		NROW = 1
-		tableView.setSpan(NROW, 1, 1, tableView.columnCount())
-		item = QTableWidgetItem("Feeds")
-		item.setTextAlignment(Qt.AlignLeft)
-		brush = QBrush(QColor(28, 128, 128))
-		brush.setStyle(Qt.SolidPattern)
-		item.setBackground(brush)
-		font = QFont()
-		font.setFamily(u"DejaVu Sans")
-		font.setPointSize(14)
-		font.setBold(True)
-		item.setFont(font)
-		tableView.setItem(NROW,0, item)
-		
+				
 		for name,sensor in sensors.iteritems():
-			 
-			NROW = itera
-			tableView.setSpan(NROW, 0, 1, tableView.columnCount())
-			item = QTableWidgetItem(sensor["name"])
+			tableView.setRowCount(itera+1)
+			tableView.setSpan(itera, 0, 1, tableView.columnCount())
+			item = QTableWidgetItem(sensor["description"])
 			item.setTextAlignment(Qt.AlignLeft)
-			brush = QBrush(QColor(164, 125, 144))
-			brush.setStyle(Qt.SolidPattern)
-			item.setBackground(brush)
 			font = QFont()
-			font.setFamily(u"DejaVu Sans")
-			font.setPointSize(12)
+			font.setBold(True)
 			item.setFont(font)
-			tableView.setItem(NROW,0, item)
+			tableView.setItem(itera,0, item)
 			itera=itera+1
-
-			NROW = itera
-			head=("Name", "Location", "Source", "Units", "Updated", "Value")
+			tableView.setRowCount(itera+1)
+			head=("Name", "Updated", "Value")
 			for j in range(len(head)):
 				item = QTableWidgetItem(head[j])
 				item.setTextAlignment(Qt.AlignCenter)
-				brush = QBrush(Qt.darkGreen)
-				brush.setStyle(Qt.SolidPattern)
-				item.setBackground(brush)
-				font = QFont()
-				font.setFamily(u"DejaVu Sans")
-				font.setPointSize(11)
-				font.setBold(True)
-				item.setFont(font)
-				tableView.setItem(NROW, j, item)
+				tableView.setItem(itera, j, item)
 			itera=itera+1
-
 			
+			if "canales" not in sensor:
+				continue
+			
+			for j in range(0,len(sensor["canales"])):
+				tableView.setRowCount(itera+1)
+			
+				print sensor["canales"][0]["name"]
+				item = QTableWidgetItem(sensor["canales"][j]["name"])  
+				item.setTextAlignment(Qt.AlignCenter)
+				tableView.setItem(itera, 0, item)				
 
-			self.setTableRows(sensor, tableView,itera)
-			itera=itera+len(sensor["canales"])					
-			tableView.horizontalHeader().setStretchLastSection(True)
+				item = QTableWidgetItem(str(sensor["updated"]))
+				item.setTextAlignment(Qt.AlignCenter)
+				tableView.setItem(itera, 1, item)
+			
+				item = QTableWidgetItem(sensor["canales"][j]["value"])
+				item.setTextAlignment(Qt.AlignCenter)
+				tableView.setItem(itera, 2, item)
+		
+				itera = itera + 1
+			tableView.resizeColumnsToContents()
 			tableView.horizontalHeader().setResizeMode(QHeaderView.Stretch);
-			
-			
-			
-
-
-		
-	def setTableRows(self, sensor, tableView,itera):
-		NROW = itera
-		brushB = QBrush(QColor(250, 250, 250))
-		brushF = QBrush(Qt.black)
-		brushB.setStyle(Qt.SolidPattern)
-		font = QFont()
-		font.setFamily(u"DejaVu Sans")
-		font.setPointSize(10)
-		font.setBold(True)
-		row = NROW
-		
-
-		for j in range(0,len(sensor["canales"])):
-			
-			item = QTableWidgetItem(sensor["ubicacion"])
-			item.setTextAlignment(Qt.AlignCenter)
-			item.setBackground(brushB)
-			item.setForeground(brushF)
-			item.setFont(font)
-			tableView.setItem(row, 1, item)
-			
-			item = QTableWidgetItem(sensor["source"])
-			item.setTextAlignment(Qt.AlignCenter)
-			item.setBackground(brushB)
-			item.setForeground(brushF)
-			item.setFont(font)
-			tableView.setItem(row, 2, item)
-		
-			print sensor["canales"][0]["name"]
-			item = QTableWidgetItem(sensor["canales"][j]["name"])  
-			item.setTextAlignment(Qt.AlignCenter)
-			item.setBackground(brushB)
-			item.setForeground(brushF)
-		
-			item.setFont(font)
-			tableView.setItem(row, 0, item)				
-
-			item = QTableWidgetItem(sensor["canales"][j]["units"]) 
-			item.setTextAlignment(Qt.AlignCenter)
-			item.setBackground(brushB)
-			item.setForeground(brushF)
-			item.setFont(font)
-			tableView.setItem(row, 3, item)
-				
-			row = row + 1
-		tableView.resizeColumnsToContents()
-			
-	def updateTableRows(self):
-		NROW = 4
-		brushB = QBrush(QColor(250, 250, 250))
-		brushF = QBrush(Qt.black)
-		brushB.setStyle(Qt.SolidPattern)
-		font = QFont()
-		font.setFamily(u"DejaVu Sans")
-		font.setPointSize(10)
-		font.setBold(True)
-		row = NROW
-		for sensor in sensors["sensores"]:
-			if sensor["source"]=="EMON":
-				f = requests.get(sensor["url"])	
-				#analyze response
-				delayed = 7
-				item = QTableWidgetItem(str(delayed))
-				item.setTextAlignment(Qt.AlignCenter)
-				item.setBackground(brushB)
-				item.setForeground(brushF)
-				item.setFont(font)
-				self.tableWidget.setItem(row, 4, item)
-			
-				item = QTableWidgetItem(f.text[1:-1])
-				item.setTextAlignment(Qt.AlignCenter)
-				item.setBackground(brushB)
-				item.setForeground(brushF)
-				item.setFont(font)
-				self.tableWidget.setItem(row, 5, item)
-				
-			row = row + 1
 	
 	@Slot(str)
 	def slotCountDown(self, ident):
-		
-		brushB = QBrush(QColor(250, 250, 250))
-		brushF = QBrush(Qt.darkGreen)
-		brushB.setStyle(Qt.SolidPattern)
-		font = QFont()
-		font.setFamily(u"DejaVu Sans")
-		font.setPointSize(10)
-		font.setBold(True)
-		sensors[ident]["countdown"] += 1
-		for i in range(0,len(sensors[ident]["canales"])):
-				 
-			item = QTableWidgetItem(str(sensors[ident]["countdown"]))
-			item.setTextAlignment(Qt.AlignCenter)
-			item.setBackground(brushB)
-			item.setForeground(brushF)
-			item.setFont(font)
-			
-			self.tableWidget.setItem(sensors[ident]["row"+str(i)], 4, item)
+		sensors[ident]["updated"] += 1
+		self.tableWidget.clear()
+		self.createTable(self.tableWidget, sensors)
 		
 	@Slot(str,dict)
 	def slotFromReader(self, ident, value ):
-		
-		brushB = QBrush(QColor(250, 250, 250))
-		brushF = QBrush(Qt.black)
-		brushB.setStyle(Qt.SolidPattern)
-		font = QFont()
-		font.setFamily(u"DejaVu Sans")
-		font.setPointSize(10)
-		font.setBold(True)
 		value=json.loads(value)
 		print  "valor "+ value["valor"]
+		self.tableWidget.clear()
+		self.createTable(self.tableWidget, sensors)
 		
-		item = QTableWidgetItem((value["valor"]))
-		item.setTextAlignment(Qt.AlignCenter)
-		item.setBackground(brushB)
-		item.setForeground(brushF)
-		item.setFont(font)
-		self.tableWidget.setItem(sensors[ident]["row"+str(value["iter"])], 5, item)		#inserta en la ultima columna
-			
-
 class Timer(QObject):
 	timeout = Signal( str )
 	def __init__(self, ident, period):	#milliseconds
@@ -310,10 +153,9 @@ class RDBReader(QThread):
 		conn = yield rdb.connect(host="158.49.247.193",port=28015,db="SmartPoliTech",auth_key="smartpolitech2")
 		feed = yield rdb.table(self.table).changes().run(conn)
 		while (yield feed.fetch_next()):
-			
 			change = yield feed.next()
 			#print "siguiente" + str(change)			
-			print "en thread", sensors[self.ident]["countdown"]
+			#print "en thread", sensors[self.ident]["countdown"]
 			sensors[self.ident]["countdown"]  = 0
 			for i in range(0,len(sensors[self.ident]["canales"])):
 				j=json.dumps({"valor":change["new_val"]["sensors"][i]["value"],"iter":i})
