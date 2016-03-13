@@ -49,6 +49,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 			sensors[ide]["timer"] = Timer(ide, 1000)
 			sensors[ide]["timer"].timeout.connect(self.slotCountDown)
 			sensors[ide]["updated"] = 0
+			sensors[ide]["active"] = True
 
 		print "Tree -----------------------"
 		pp = pprint.PrettyPrinter(indent=4)
@@ -57,6 +58,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
 		#create Tree
 		self.createTree()
+		self.treeWidget.itemClicked.connect(self.on_itemClicked)
 
 		#create UI table
 		self.createTable(self.tableWidget, sensors)
@@ -67,13 +69,37 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 		[s["timer"].start() for s in sensors.values()]
 
 	def createTree(self):
-		self.treeWidget.setColumnCount(1)
-		items = []
+		self.treeWidget.setColumnCount(2)
+		self.treeWidget.setHeaderLabels(["Dispositivo" , "On/off"])
+		self.treeWidget.header().setResizeMode(0, QHeaderView.ResizeToContents)
+		#self.treeWidget.setColumnWidth(1, 4)
+		#self.treeWidget.header().setResizeMode(1, QHeaderView.Fixed)
+		#items = []
 		for s in sensors.values():
-			name = QTreeWidgetItem(self.treeWidget)
-			name.setText(0, s["description"] + "   ( " + s["id"] + " )")
-			items.append(name)
-		self.treeWidget.insertTopLevelItems(0, items)
+			top = QTreeWidgetItem(self.treeWidget)
+			#name.setText(0, s["description"] + "   ( " + s["id"] + " )")
+			top.setText(0, s["description"])
+			#top.setText(1, s["id"])
+			top.setIcon(1,QIcon("greenBall.png"))
+			child = QTreeWidgetItem(top)
+			child.setText(0, s["id"])
+			child = QTreeWidgetItem(top)
+			child.setText(0, s["type"])
+			child = QTreeWidgetItem(top)
+			child.setText(0, s["location"])
+
+	@Slot(QTreeWidgetItem, int)
+	def on_itemClicked(self, item, column):
+		if item.child(0).text(0) in sensors:                ##Connection to model
+			if sensors[item.child(0).text(0)]["active"] is True:
+				item.setIcon(1, QIcon("redBall.png"))
+				sensors[item.child(0).text(0)]["active"] = False
+			else:
+				item.setIcon(1, QIcon("greenBall.png"))
+				sensors[item.child(0).text(0)]["active"] = True
+		self.tableWidget.clear()
+		self.createTable(self.tableWidget, sensors)
+		#treeWidget.currentItem().setBackground(1, brush_green)
 
 	def createTable(self, tableView, sensors):
 		itera = 0
@@ -82,9 +108,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 		tableView.verticalHeader().hide()
 		tableView.setWordWrap(True)
 		tableView.setTextElideMode(Qt.ElideNone)
-		tableView.setShowGrid(False)
+		#tableView.setShowGrid(False)
 
 		for name, sensor in sensors.iteritems():
+			if sensor["active"] is False:
+				continue
 			tableView.setRowCount(itera + 1)
 			tableView.setSpan(itera, 0, 1, tableView.columnCount())
 			item = QTableWidgetItem(sensor["description"] + "   ( " + sensor["id"] + " )")
