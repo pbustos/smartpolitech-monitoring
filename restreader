@@ -1,0 +1,18 @@
+#Reader for REST sensors
+class RESTReader(QObject):
+	signalVal = Signal(str, dict)
+
+	def __init__(self, ident, url, period):
+		super(RESTReader, self).__init__()
+		self.ident = ident
+		self.url = url
+		self.period = period
+
+	def start(self):
+		try:
+			f = requests.get(self.url)
+			sensors[self.ident]["countdown"] = 0
+			self.signalVal.emit(self.ident, f.text[1:-1])
+			print "rest reader", f.text[1:-1]
+		finally:
+			QTimer.singleShot(int(self.period), self.start)

@@ -22,7 +22,7 @@
       </property>
       <widget class="QTreeWidget" name="treeWidget">
        <property name="sizePolicy">
-        <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+        <sizepolicy hsizetype="MinimumExpanding" vsizetype="Expanding">
          <horstretch>0</horstretch>
          <verstretch>0</verstretch>
         </sizepolicy>
@@ -34,6 +34,12 @@
        </column>
       </widget>
       <widget class="QTabWidget" name="tabWidget">
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+         <horstretch>0</horstretch>
+         <verstretch>0</verstretch>
+        </sizepolicy>
+       </property>
        <property name="currentIndex">
         <number>0</number>
        </property>
@@ -82,13 +88,13 @@
               <item>
                <layout class="QVBoxLayout" name="verticalLayout">
                 <item>
-                 <widget class="PlotWidget" name="graphicsView"/>
+                 <widget class="PlotWidget" name="plot1"/>
                 </item>
                 <item>
-                 <widget class="PlotWidget" name="graphicsView_2"/>
+                 <widget class="PlotWidget" name="plot2"/>
                 </item>
                 <item>
-                 <widget class="PlotWidget" name="graphicsView_3"/>
+                 <widget class="PlotWidget" name="plot3"/>
                 </item>
                </layout>
               </item>
