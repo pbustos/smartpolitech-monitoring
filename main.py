@@ -41,20 +41,20 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 		self.reader.start()
 
 		for device in devices:
-			if device["id"] == CURRENT:
-				ide = device["id"]
-				sensors[ide] = device
-				table = "D" + ide.replace("-", "")
-				sensors[ide]["table"] = table
-				if rdb.table(table).is_empty().run(self.conn) is False:
-					datos = rdb.table(table).max("date").run(self.conn)
-					sensors[ide]["canales"] = datos["sensors"]
-				sensors[ide]["timer"] = Timer(ide, 1000)
-				sensors[ide]["timer"].timeout.connect(self.slotCountDown)
-				#sensors[ide]["timer"].timeout.connect(self.plotUpdate)
-				sensors[ide]["updated"] = 0
-				sensors[ide]["active"] = True
-				self.reader.addTable(ide, table)
+			#if device["id"] == CURRENT:
+			ide = device["id"]
+			sensors[ide] = device
+			table = "D" + ide.replace("-", "")
+			sensors[ide]["table"] = table
+			if rdb.table(table).is_empty().run(self.conn) is False:
+				datos = rdb.table(table).max("date").run(self.conn)
+				sensors[ide]["canales"] = datos["sensors"]
+			sensors[ide]["timer"] = Timer(ide, 1000)
+			sensors[ide]["timer"].timeout.connect(self.slotCountDown)
+			#sensors[ide]["timer"].timeout.connect(self.plotUpdate)
+			sensors[ide]["updated"] = 0
+			sensors[ide]["active"] = True
+			self.reader.addTable(ide, table)
 
 		# print "Tree -----------------------"
 		# pp = pprint.PrettyPrinter(indent=4)
@@ -198,18 +198,15 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 		print "graph clicked", row, col
 		#check if is a valid spot
 		found = False
-		for k, s in sensors.iteritems():
+		for k, s in sensors.items():
 			for c, pos in zip(s["canales"], range(len(s["canales"]))):
 				if c["counterPos"][0] == row and col == 3:
 					found = True
+					print "Eureka", k, pos
+					self.drawModalGraph(sensors[k], pos)
 					break
-		if found:
-			# modal window for sensors[k]
-			self.drawModalGraph(sensors[k], pos)
 
-		#create a popup with a graph
-		#keep updating the graph until closed
-
+	#create a popup with a graph
 	def drawModalGraph(self, sensor, canal):
 		self.dlg = QDialog()
 		plotDlg = Ui_PlotDlg()
