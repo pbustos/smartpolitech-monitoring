@@ -12,16 +12,17 @@ import rethinkdb as rdb
 import datetime as dt
 from rethinkreader import RDBReader
 from timer import Timer
-from pytz import timezone
 from dateutil import parser
+from plotter import Plotter
 
 # Generate GUI form .ui file
 call("pyside-uic smartsensors.ui > ui_smartsensors.py", shell=True)
 call("pyside-uic plotdlg.ui > ui_plotdlg.py", shell=True)
+call("pyside-uic plotdlg2.ui > ui_plotdlg2.py", shell=True)
 #call("pyuic5 smartsensors.ui > ui_smartsensors.py", shell=True)
 from ui_smartsensors import Ui_MainWindow
 from ui_plotdlg import Ui_PlotDlg
-from pytz import timezone
+from ui_plotdlg2 import Ui_PlotDlg2
 
 plots = {}
 sensors = {}
@@ -33,7 +34,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 	def __init__(self):
 		super(MainWindow, self).__init__()
 		self.setupUi(self)
-		global sensors, row, CURRENT_TABLE
+		global sensors, CURRENT_TABLE
 		self.conn = rdb.connect(host=connData["host"], port=connData["port"], db=connData["db"], auth_key=connData["auth_key"])
 		devices = rdb.table("Dispositivos").run(self.conn)
 		pp = pprint.PrettyPrinter(indent=4)
@@ -69,7 +70,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 		self.treeWidget.itemClicked.connect(self.on_itemClicked)
 
 		#create UI table
-		self.createTable(self.tableWidget, sensors)
+		self.createTable(self.tableWidget)
 		self.tableWidget.cellClicked.connect(self.on_graphClicked)
 		self.show()
 
@@ -107,7 +108,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 			child = QTreeWidgetItem(top)
 			child.setText(1, s["location"])
 
-	def createTable(self, tableView, sensors):
+	def createTable(self, tableView):
 		itera = 0
 		tableView.setColumnCount(4)
 		tableView.horizontalHeader().hide()
@@ -128,7 +129,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 			font.setBold(True)
 			item.setFont(font)
 			tableView.setItem(itera, 0, item)
-			itera = itera + 1
+			itera += 1
 			tableView.setRowCount(itera + 1)
 			head = ("Name", "Updated", "Value", "Graph")
 			for h, j in zip(head, range(len(head))):
@@ -138,7 +139,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 				item.setForeground(Qt.blue)
 				item.setFont(font)
 				tableView.setItem(itera, j, item)
-			itera = itera + 1
+			itera += 1
 
 			if "canales" not in sensor:
 				continue
@@ -174,7 +175,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 				#Add widget
 				sensor["canales"][j]["widget"] = item
 
-				itera = itera + 1
+				itera += 1
 
 			tableView.resizeColumnsToContents()
 			tableView.horizontalHeader().setResizeMode(QHeaderView.Stretch);
@@ -203,81 +204,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 		found = False
 		for k, s in sensors.items():
 			for c, pos in zip(s["canales"], range(len(s["canales"]))):
+				#Check if clicked row is on of the stored rows and clicked column is 3
 				if c["counterPos"][0] == row and col == 3:
 					found = True
 					print "Eureka", k, pos
-					self.drawModalGraph(sensors[k], pos)
+					self.p = Plotter(self.conn, sensors)
 					break
-
-	#create a popup with a graph
-
-	def drawModalGraph(self, sensor, canal):
-		self.dlg = QDialog()
-		self.plotDlg = Ui_PlotDlg()
-		self.plotDlg.setupUi(self.dlg)
-		self.dlg.setWindowModality(Qt.ApplicationModal)
-		self.dlg.show()
-		self.curve = self.plotDlg.plot.plot()
-		#lastData = rdb.table(sensor["table"]).order_by(rdb.desc("date")).limit(100).run(self.conn)
-		# ayerR = rdb.expr(dt.datetime.now(timezone('Europe/Madrid')) - dt.timedelta(days=1)).run(self.conn)
-		# hourR = rdb.expr(dt.datetime.now(timezone('Europe/Madrid')) - dt.timedelta(hours=1)).run(self.conn)
-
-		# cur = rdb.table(sensor["table"]).run(self.conn)
-		# ayer = dt.datetime.now(timezone('Europe/Madrid')) - dt.timedelta(days=1)
-		# lastData = []
-		# for doc in cur:
-		# 	if parser.parse(doc["date"]) > dt.datetime.now(timezone('Europe/Madrid')) - dt.timedelta(hours=1):
-		# 		lastDatad.append(doc)
-		#
-		# hour = dt.datetime.now(timezone('Europe/Madrid')) - dt.timedelta(hours=1)
-
-		#lastData = list(rdb.table(sensor["table"]).filter(lambda doc: dt.datetime.strptime(str(doc["date"]), '%Y-%m-%dT%H:%M:%SZ') > hour).run(self.conn))
-
-		# print hourR, "selected", len(lastData)
-		# self.data = deque(maxlen=len(lastData))
-		# for d, icont in zip(list(lastData), range(len(lastData))):
-		# 	self.data.append({'x': icont, 'y': float(d["sensors"][canal]["value"])})
-		# x = [item['x'] for item in self.data]
-		# y = [item['y'] for item in self.data]
-		# self.curve.setData(x=x, y=y)
-		self.dayData()
-		self.plotDlg.dayButton.clicked.connect(self.dayData)
-		self.plotDlg.hourButton.clicked.connect(self.hourData)
-		self.plotDlg.weekButton.clicked.connect(self.weekData)
-		self.plotDlg.monthButton.clicked.connect(self.monthData)
-		self.plotDlg.yearButton.clicked.connect(self.yearData)
-
-	def dayData(self):
-		self.getPastData(dt.timedelta(days=1))
-
-	def hourData(self):
-		self.getPastData(dt.timedelta(hours=1))
-
-	def weekData(self):
-		self.getPastData(dt.timedelta(weeks=1))
-
-	def monthData(self):
-		self.getPastData(dt.timedelta(weeks=4))
-
-	def yearData(self):
-		self.getPastData(dt.timedelta(weeks=52))
-
-	def getPastData(self, delta):
-		cur = rdb.table(sensors[CURRENT]["table"]).run(self.conn)
-		self.data = []
-		icont = 0
-		for d in cur:
-			if parser.parse(d["date"]) > dt.datetime.now(timezone('Europe/Madrid')) - delta:
-				self.data.append({'x': icont, 'y': float(d["sensors"][0]["value"])})
-				icont += 1
-		print "selected", icont
-		x = [item['x'] for item in self.data]
-		y = [item['y'] for item in self.data]
-		self.curve.setData(x=x, y=y)
-		self.plotDlg.totalLcd.display(icont)
-
-	def mouseDragEvent(self, *args, **kwargs):
-		print "mousepress"
 
 	@Slot(str)
 	def plotUpdate(self, ident):
@@ -299,7 +231,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 	@Slot(str)
 	def slotFromReader(self, ident):
 		self.tableWidget.clear()
-		self.createTable(self.tableWidget, sensors)
+		self.createTable(self.tableWidget)
+
+
 
 
 if __name__ == '__main__':
