@@ -24,7 +24,6 @@ class Plotter(QObject):
 		self.plotDlg = Ui_PlotDlg()
 		self.plotDlg.setupUi(self.dlg)
 		self.dlg.setWindowModality(Qt.ApplicationModal)
-
 		self.plot = pg.PlotWidget(parent=None, background='default', labels={'left': ('Temperature', 'ºC')},
 		                          axisItems={'bottom': TimeAxisItem(orientation='bottom')})
 		self.plot.setObjectName("plot")
@@ -40,23 +39,29 @@ class Plotter(QObject):
 		self.plotDlg.monthButton.clicked.connect(self.monthData)
 		self.plotDlg.yearButton.clicked.connect(self.yearData)
 		self.plot.sigRangeChanged.connect(self.plotClicked)
-
+		self.plot.scene().sigMouseMoved.connect(self.mouseMoved)
+		#self.cpoint = pg.CurvePoint(self.curve)
+		#self.plot.addItem(self.cpoint)
+		self.label = pg.TextItem(anchor=(0, 0))
+		#self.label.setParentItem(self.cpoint)
+		self.plot.addItem(self.label)
 		self.dayData()
 
 	def getPastData(self, delta):
 			cur = rdb.table(self.sensors[CURRENT]["table"]).order_by("date").run(self.conn)
 			x = []
-			y = []
+			self.y = []
 			icont = 0
 			for d in cur:
 				timeData = parser.parse(d["date"])
 				if timeData > (dt.datetime.now(pytz.timezone('Europe/Madrid')) - delta):
 					x.append(self.timestamp(timeData))
-					y.append(float(d["sensors"][0]["value"]))
+					self.y.append(float(d["sensors"][0]["value"]))
 					icont += 1
 			print "selected", icont
-			self.curve.setData(x=x, y=y)
+			self.curve.setData(x=x, y=self.y)
 			self.plotDlg.totalLcd.display(icont)
+
 
 	def timestamp(self, date):
 		epoch = dt.datetime(1970, 1, 1, 0, 0, tzinfo=pytz.utc)
@@ -66,9 +71,17 @@ class Plotter(QObject):
 	# SLOTS
 	#
 
+	@Slot(list)
+	def mouseMoved(self, pos):
+		p = self.plot.plotItem.vb.mapSceneToView(pos)
+		## We need to find curve coordinates for p
+		self.label.setText('%0.2f' % p.y())
+		self.label.setPos(p)
+
 	@Slot(object, object)
 	def plotClicked(self, a, b):
-		print "hol3", a, b
+		#print "hol3", a, b
+		pass
 
 	def dayData(self):
 		self.getPastData(dt.timedelta(days=1))

@@ -1,10 +1,13 @@
+##
 ## Monitoring system for SmartPoliTech
 ##
-import sys, json, requests, json, time, threading, pprint
+
+import sys, json, requests, json, time, pprint
 import numpy as np
 from collections import deque
 from PySide.QtCore import *
 from PySide.QtGui import *
+from PySide.QtSvg import *
 from collections import deque
 import pyqtgraph as pg
 from subprocess import call
@@ -14,15 +17,14 @@ from rethinkreader import RDBReader
 from timer import Timer
 from dateutil import parser
 from plotter import Plotter
+from svg import Svg
 
 # Generate GUI form .ui file
 call("pyside-uic smartsensors.ui > ui_smartsensors.py", shell=True)
 call("pyside-uic plotdlg.ui > ui_plotdlg.py", shell=True)
-call("pyside-uic plotdlg2.ui > ui_plotdlg2.py", shell=True)
 #call("pyuic5 smartsensors.ui > ui_smartsensors.py", shell=True)
 from ui_smartsensors import Ui_MainWindow
 from ui_plotdlg import Ui_PlotDlg
-from ui_plotdlg2 import Ui_PlotDlg2
 
 plots = {}
 sensors = {}
@@ -30,16 +32,18 @@ connData = {"host":"158.49.247.193", "port":"28015", "db":"SmartPoliTech", "auth
 CURRENT = "024020cc-28df-4c48-aa93-52e7193c9570"
 CURRENT_TABLE = "D024020cc28df4c48aa9352e7193c9570"
 
+
 class MainWindow(QMainWindow, Ui_MainWindow):
 	def __init__(self):
 		super(MainWindow, self).__init__()
 		self.setupUi(self)
 		global sensors, CURRENT_TABLE
 		self.conn = rdb.connect(host=connData["host"], port=connData["port"], db=connData["db"], auth_key=connData["auth_key"])
+		# Set a changefeed for "Dispositivos" with initial stete reading
 		devices = rdb.table("Dispositivos").run(self.conn)
 		pp = pprint.PrettyPrinter(indent=4)
 
-		#Init the DB reader thread
+		# Init the DB reader thread
 		self.reader = RDBReader(connData, sensors)
 		self.reader.signalVal.connect(self.slotFromReader)
 		self.reader.start()
@@ -50,6 +54,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 				sensors[ide] = device
 				table = "D" + ide.replace("-", "")
 				sensors[ide]["table"] = table
+				# Poner todos como OFF y hacer esto en background
 				if rdb.table(table).is_empty().run(self.conn) is False:
 					datos = rdb.table(table).max("date").run(self.conn)
 					sensors[ide]["canales"] = datos["sensors"]
@@ -59,36 +64,39 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 				sensors[ide]["updated"] = 0
 				sensors[ide]["active"] = True
 				self.reader.addTable(ide, table)
-
+				
 		# print "Tree -----------------------"
 		# pp = pprint.PrettyPrinter(indent=4)
 		# pp.pprint(sensors)
 		# print "-----------------------"
-
-		#create Tree
+		
+		# create Tree
 		self.createTree()
 		self.treeWidget.itemClicked.connect(self.on_itemClicked)
-
-		#create UI table
+		
+		# create UI table
 		self.createTable(self.tableWidget)
 		self.tableWidget.cellClicked.connect(self.on_graphClicked)
 		self.show()
-
-		#Plots
-		# self.curve = self.plot1.plot()
-		# self.data = deque(maxlen=100)
-		# lastData = rdb.table(CURRENT_TABLE).order_by(rdb.desc("date")).limit(100).run(self.conn)
-		# self.icont=0
-		# for d in lastData:
-		# 	self.data.append({'x': self.icont, 'y': float(d["sensors"][0]["value"])})
-		#  	self.icont += 1
-		# x = [item['x'] for item in self.data]
-		# y = [item['y'] for item in self.data]
-		# self.curve.setData(x=x, y=y)
-
-		#Start timers
-		#self.reader.addTable("8c3450b7-9a74-4149-9ed3-a4098f4f88b3", "D8c3450b79a7441499ed3a4098f4f88b3")
+		
+		# Start timers
+		# self.reader.addTable("8c3450b7-9a74-4149-9ed3-a4098f4f88b3", "D8c3450b79a7441499ed3a4098f4f88b3")
 		[s["timer"].start() for s in sensors.values()]
+		
+		# Svg rendering
+		self.tabWidget.currentChanged.connect(self.doSvg)
+		
+	@Slot(int)
+	def doSvg(self, index):
+		print "now we are"
+		if index is not 2:
+			return
+		#svg = Svg(self.tableWidget.widget(index))
+		self.render = QSvgWidget()
+		self.render.setParent(self.tabWidget.widget(index))
+		self.render.load('svg/informatica.svg')
+		self.render.show()
+		self.render.renderer().
 
 	def createTree(self):
 		self.treeWidget.setColumnCount(2)
