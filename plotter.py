@@ -15,10 +15,11 @@ from ui_plotdlg import Ui_PlotDlg
 CURRENT = "024020cc-28df-4c48-aa93-52e7193c9570"
 
 class Plotter(QObject):
-	def __init__(self, conn, sensors):
+	def __init__(self, conn, sensor, numCanal):
 		super(QObject, self).__init__()
 		self.conn = conn
-		self.sensors = sensors
+		self.sensor = sensor
+		self.numCanal = numCanal
 		pg.setConfigOptions(antialias=True)
 		self.dlg = QDialog()
 		self.plotDlg = Ui_PlotDlg()
@@ -48,7 +49,14 @@ class Plotter(QObject):
 		self.dayData()
 
 	def getPastData(self, delta):
-			cur = rdb.table(self.sensors[CURRENT]["table"]).order_by("date").run(self.conn)
+			cur = rdb.table(self.sensor["table"]).order_by("date").run(self.conn)
+			if self.sensor["canales"][self.numCanal]["name"] in ('temp', 'temperatura', 'temperature'):
+				self.plot.setLabel('left', text='Temperatura', units='ºC')
+			if self.sensor["canales"][self.numCanal]["name"] in ('hum', 'humedad', 'humidity'):
+				self.plot.setLabel('left', text='Humidity', units='%')
+			if self.sensor["canales"][self.numCanal]["name"] in ('volt', 'vbat', 'bat'):
+				self.plot.setLabel('left', text='Volts', units='V')
+
 			x = []
 			self.y = []
 			icont = 0
@@ -56,7 +64,7 @@ class Plotter(QObject):
 				timeData = parser.parse(d["date"])
 				if timeData > (dt.datetime.now(pytz.timezone('Europe/Madrid')) - delta):
 					x.append(self.timestamp(timeData))
-					self.y.append(float(d["sensors"][0]["value"]))
+					self.y.append(float(d["sensors"][self.numCanal]["value"]))
 					icont += 1
 			print "selected", icont
 			self.curve.setData(x=x, y=self.y)

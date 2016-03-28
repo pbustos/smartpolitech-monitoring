@@ -84,19 +84,17 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 		[s["timer"].start() for s in sensors.values()]
 		
 		# Svg rendering
-		self.tabWidget.currentChanged.connect(self.doSvg)
+		self.svg = Svg(self.tabWidget.widget(2), self.svgLayout)
+		#self.tabWidget.currentChanged.connect(self.doSvg)
+
+		#Flip button
+
 		
-	@Slot(int)
-	def doSvg(self, index):
-		print "now we are"
-		if index is not 2:
-			return
-		#svg = Svg(self.tableWidget.widget(index))
-		self.render = QSvgWidget()
-		self.render.setParent(self.tabWidget.widget(index))
-		self.render.load('svg/informatica.svg')
-		self.render.show()
-		self.render.renderer().
+	# @Slot(int)
+	# def doSvg(self, index):
+	# 	print "now we are"
+	# 	if index is not 2:
+	# 		return
 
 	def createTree(self):
 		self.treeWidget.setColumnCount(2)
@@ -194,29 +192,29 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
 	@Slot(QTreeWidgetItem, int)
 	def on_itemClicked(self, item, col):
-		print item.child(0).text(1)
-		if item.child(0).text(1) in sensors:                ##Connection to model
-			if sensors[item.child(0).text(1)]["active"] is True:
+		disp = item.child(0).text(1)
+		if disp in sensors:                ##Connection to model
+			if sensors[disp]["active"] is True:
 				item.setIcon(0, QIcon("icons/redBall.png"))
-				sensors[item.child(0).text(1)]["active"] = False
+				sensors[disp]["active"] = False
 			else:
 				item.setIcon(0, QIcon("icons/greenBall.png"))
-				sensors[item.child(0).text(1)]["active"] = True
+				sensors[disp]["active"] = True
 		self.tableWidget.clear()
-		self.createTable(self.tableWidget, sensors)
+		self.createTable(self.tableWidget)
 
 	@Slot(int, int)
 	def on_graphClicked(self, row, col):
 		print "graph clicked", row, col
 		#check if is a valid spot
+		if col is not 3:
+			return
 		found = False
 		for k, s in sensors.items():
 			for c, pos in zip(s["canales"], range(len(s["canales"]))):
-				#Check if clicked row is on of the stored rows and clicked column is 3
-				if c["counterPos"][0] == row and col == 3:
-					found = True
-					print "Eureka", k, pos
-					self.p = Plotter(self.conn, sensors)
+				#Check if clicked row is on of the stored rows
+				if c["counterPos"][0] == row:
+					self.p = Plotter(self.conn, s, pos)
 					break
 
 	@Slot(str)
@@ -240,8 +238,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 	def slotFromReader(self, ident):
 		self.tableWidget.clear()
 		self.createTable(self.tableWidget)
-
-
 
 
 if __name__ == '__main__':
