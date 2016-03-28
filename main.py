@@ -49,22 +49,22 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 		self.reader.start()
 
 		for device in devices:
-			if device["id"] == CURRENT:
-				ide = device["id"]
-				sensors[ide] = device
-				table = "D" + ide.replace("-", "")
-				sensors[ide]["table"] = table
-				# Poner todos como OFF y hacer esto en background
-				if rdb.table(table).is_empty().run(self.conn) is False:
-					datos = rdb.table(table).max("date").run(self.conn)
-					sensors[ide]["canales"] = datos["sensors"]
-				sensors[ide]["timer"] = Timer(ide, 1000)
-				sensors[ide]["timer"].timeout.connect(self.slotCountDown)
-				#sensors[ide]["timer"].timeout.connect(self.plotUpdate)
-				sensors[ide]["updated"] = 0
-				sensors[ide]["active"] = True
-				self.reader.addTable(ide, table)
-				
+			#if device["id"] == CURRENT:
+			ide = device["id"]
+			sensors[ide] = device
+			table = "D" + ide.replace("-", "")
+			sensors[ide]["table"] = table
+			# Poner todos como OFF y hacer esto en background
+			if rdb.table(table).is_empty().run(self.conn) is False:
+				datos = rdb.table(table).max("date").run(self.conn)
+				sensors[ide]["canales"] = datos["sensors"]
+			sensors[ide]["timer"] = Timer(ide, 1000)
+			sensors[ide]["timer"].timeout.connect(self.slotCountDown)
+			#sensors[ide]["timer"].timeout.connect(self.plotUpdate)
+			sensors[ide]["updated"] = 0
+			sensors[ide]["active"] = True
+			self.reader.addTable(ide, table)
+			
 		# print "Tree -----------------------"
 		# pp = pprint.PrettyPrinter(indent=4)
 		# pp.pprint(sensors)
