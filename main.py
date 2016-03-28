@@ -64,7 +64,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 			sensors[ide]["updated"] = 0
 			sensors[ide]["active"] = True
 			self.reader.addTable(ide, table)
-			
+
 		# print "Tree -----------------------"
 		# pp = pprint.PrettyPrinter(indent=4)
 		# pp.pprint(sensors)
@@ -88,8 +88,22 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 		#self.tabWidget.currentChanged.connect(self.doSvg)
 
 		#Flip button
+		self.flipButton.clicked.connect(self.flipAll)
 
-		
+	#Slot to flip all devices to off/on
+	def flipAll(self):
+		print "hola", self.flipButton.isChecked()
+		if self.flipButton.isChecked():
+			for v in sensors.itervalues():
+				v["active"] = False
+		else:
+			for v in sensors.itervalues():
+				v["active"] = True
+		self.treeWidget.clear()
+		self.createTree()
+		self.tableWidget.clear()
+		self.createTable(self.tableWidget)
+
 	# @Slot(int)
 	# def doSvg(self, index):
 	# 	print "now we are"
@@ -105,8 +119,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 			top = QTreeWidgetItem(self.treeWidget)
 			#name.setText(0, s["description"] + "   ( " + s["id"] + " )")
 			top.setText(1, s["description"])
-			#top.setText(1, s["id"])
-			top.setIcon(0, QIcon("icons/greenBall.png"))
+			if s["active"] is True:
+				top.setIcon(0, QIcon("icons/greenBall.png"))
+			else:
+				top.setIcon(0, QIcon("icons/redBall.png"))
 			child = QTreeWidgetItem(top)
 			child.setText(1, s["id"])
 			child = QTreeWidgetItem(top)
@@ -229,6 +245,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 	@Slot(str)
 	def slotCountDown(self, ident):
 		sensors[ident]["updated"] += 1
+		if sensors[ident]["active"] is False:
+			return
 		for canal in sensors[ident]["canales"]:
 			if "counterPos" in canal:
 				row, col = canal["counterPos"]
