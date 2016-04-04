@@ -18,6 +18,7 @@ from timer import Timer
 from dateutil import parser
 from plotter import Plotter
 from svg import Svg
+import pytz
 
 # Generate GUI form .ui file
 call("pyside-uic smartsensors.ui > ui_smartsensors.py", shell=True)
@@ -60,8 +61,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 				sensors[ide]["canales"] = datos["sensors"]
 			sensors[ide]["timer"] = Timer(ide, 1000)
 			sensors[ide]["timer"].timeout.connect(self.slotCountDown)
-			#sensors[ide]["timer"].timeout.connect(self.plotUpdate)
-			sensors[ide]["updated"] = 0
+			secs = (dt.datetime.now(pytz.utc) - parser.parse(datos["date"])).total_seconds()
+			sensors[ide]["updated"] = dt.timedelta(seconds=secs)
 			sensors[ide]["active"] = True
 			self.reader.addTable(ide, table)
 
@@ -84,7 +85,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 		[s["timer"].start() for s in sensors.values()]
 		
 		# Svg rendering
-		self.svg = Svg(self.tabWidget.widget(2), self.svgLayout)
+		self.svg = Svg(self.tabWidget.widget(1), self.svgLayout)
 		#self.tabWidget.currentChanged.connect(self.doSvg)
 
 		#Flip button
@@ -173,12 +174,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 				item.setTextAlignment(Qt.AlignCenter)
 				tableView.setItem(itera, 0, item)
 
-				item = QTableWidgetItem(str(sensor["updated"]))
+				item = QTableWidgetItem("{:0>8}".format(sensor["updated"]).split('.', 1)[0])
 				item.setTextAlignment(Qt.AlignCenter)
-				if sensor["updated"] < 30:
-					item.setForeground(QBrush(Qt.green))
+				if sensor["updated"].seconds < 600:
+				 	item.setForeground(QBrush(Qt.green))
 				else:
-					item.setForeground(QBrush(Qt.red))
+				 	item.setForeground(QBrush(Qt.red))
 				tableView.setItem(itera, 1, item)
 
 				#Add position of counter
@@ -244,13 +245,14 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
 	@Slot(str)
 	def slotCountDown(self, ident):
-		sensors[ident]["updated"] += 1
+		sensors[ident]["updated"] += dt.timedelta(seconds=1)
 		if sensors[ident]["active"] is False:
 			return
 		for canal in sensors[ident]["canales"]:
 			if "counterPos" in canal:
 				row, col = canal["counterPos"]
-				self.tableWidget.item(row, col).setText(str(sensors[ident]["updated"]))
+				self.tableWidget.item(row, col).setText("{:0>8}".format(sensors[ident]["updated"]).split('.', 1)[0])
+
 
 	@Slot(str)
 	def slotFromReader(self, ident):
