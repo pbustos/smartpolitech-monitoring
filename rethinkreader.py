@@ -3,6 +3,7 @@
 from PySide.QtCore import *
 import rethinkdb as rdb
 from tornado import ioloop, gen
+import datetime as dt
 
 class RDBReader(QThread):
 	signalVal = Signal(str)
@@ -21,7 +22,7 @@ class RDBReader(QThread):
 		feed = yield rdb.table(table).changes().run(connection)
 		while (yield feed.fetch_next()):
 			change = yield feed.next()
-			sensors[ident]["updated"] = 0
+			sensors[ident]["updated"] = dt.timedelta(seconds=0)
 			sensors[ident]["canales"] = change["new_val"]["sensors"]
 			self.signalVal.emit(ident)
 

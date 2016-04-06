@@ -13,6 +13,7 @@ from ui_plotdlg import Ui_PlotDlg
 
 
 CURRENT = "024020cc-28df-4c48-aa93-52e7193c9570"
+tempExtTable = "D1c1857087db041f9a9ee39de67a89cd2"
 
 class Plotter(QObject):
 	def __init__(self, conn, sensor, numCanal):
@@ -31,6 +32,7 @@ class Plotter(QObject):
 		self.plotDlg.verticalLayout.addWidget(self.plot)
 		self.dlg.show()
 		self.curve = self.plot.plot()
+		self.plot.enableAutoRange()
 		self.curve.curve.setClickable(True)
 		self.plot.showGrid(x=True, y=True, alpha=0.5)
 
@@ -46,30 +48,53 @@ class Plotter(QObject):
 		self.label = pg.TextItem(anchor=(0, 0))
 		#self.label.setParentItem(self.cpoint)
 		self.plot.addItem(self.label)
+		self.plotDlg.dayButton.setFocus()
 		self.dayData()
 
 	def getPastData(self, delta):
 			cur = rdb.table(self.sensor["table"]).order_by("date").run(self.conn)
-			if self.sensor["canales"][self.numCanal]["name"] in ('temp', 'temperatura', 'temperature'):
-				self.plot.setLabel('left', text='Temperatura', units='ºC')
-			if self.sensor["canales"][self.numCanal]["name"] in ('hum', 'humedad', 'humidity'):
-				self.plot.setLabel('left', text='Humidity', units='%')
-			if self.sensor["canales"][self.numCanal]["name"] in ('volt', 'vbat', 'bat'):
-				self.plot.setLabel('left', text='Volts', units='V')
-
 			x = []
-			self.y = []
+			y = []
 			icont = 0
 			for d in cur:
 				timeData = parser.parse(d["date"])
 				if timeData > (dt.datetime.now(pytz.timezone('Europe/Madrid')) - delta):
 					x.append(self.timestamp(timeData))
-					self.y.append(float(d["sensors"][self.numCanal]["value"]))
+					y.append(float(d["sensors"][self.numCanal]["value"]))
 					icont += 1
 			print "selected", icont
-			self.curve.setData(x=x, y=self.y)
-			self.plotDlg.totalLcd.display(icont)
+			self.curve.setData(x=x, y=y)
+			canal = self.sensor["canales"][self.numCanal]["name"]
+			if canal in ('temp', 'temperatura', 'temperature'):
+				self.plot.setLabel('left', text='Temperatura', units='ºC')
+				# Read external temperature and draw in the same grpah
+				#cur = rdb.table(self.tempExtTable).order_by("date").run(self.conn)
+				lag = dt.datetime.now(pytz.timezone('Europe/Madrid')) - delta
+				cur = rdb.table(tempExtTable).filter(rdb.row['date'].during(rdb.now(), lag, left_bound="open", right_bound="closed")).run(self.conn)
+				x = []
+				y = []
+				icont = 0
+				for d in cur:
+					timeData = parser.parse(d["date"])
+					y.append(float(d["sensors"][self.numCanal]["value"]))
+					x.append(self.timestamp(timeData))
+					icont += 1
+				print "Ext Time selected", icont
+				self.curveExt = self.plot.plot()
+				self.curveExt.setData(x=x, y=y)
 
+
+			if canal in ('hum', 'humedad', 'humidity'):
+				self.plot.setLabel('left', text='Humidity', units='%')
+			if canal in ('volt', 'vbat', 'bat'):
+				self.plot.setLabel('left', text='Volts', units='V')
+			if canal in ('co2', 'CO2'):
+				self.plot.setLabel('left', text='CO2', units='ppm')
+				self.plot.setYRange(0,2000)
+
+
+
+			self.plotDlg.totalLcd.display(icont)
 
 	def timestamp(self, date):
 		epoch = dt.datetime(1970, 1, 1, 0, 0, tzinfo=pytz.utc)

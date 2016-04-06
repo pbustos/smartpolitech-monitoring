@@ -88,7 +88,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 		self.svg = Svg(self.tabWidget.widget(1), self.svgLayout)
 		#self.tabWidget.currentChanged.connect(self.doSvg)
 
-		#Flip button
+		# Flip button
 		self.flipButton.clicked.connect(self.flipAll)
 
 	#Slot to flip all devices to off/on
