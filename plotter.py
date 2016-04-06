@@ -68,21 +68,21 @@ class Plotter(QObject):
 			if canal in ('temp', 'temperatura', 'temperature'):
 				self.plot.setLabel('left', text='Temperatura', units='ºC')
 				# Read external temperature and draw in the same grpah
-				#cur = rdb.table(self.tempExtTable).order_by("date").run(self.conn)
-				lag = dt.datetime.now(pytz.timezone('Europe/Madrid')) - delta
-				cur = rdb.table(tempExtTable).filter(rdb.row['date'].during(rdb.now(), lag, left_bound="open", right_bound="closed")).run(self.conn)
+				cur = rdb.table(tempExtTable).order_by("date").run(self.conn)
+				#lag = dt.datetime.now(pytz.timezone('Europe/Madrid')) - delta
+				#cur = rdb.table(tempExtTable).filter(rdb.row['date'].during(rdb.now(), lag, left_bound="open", right_bound="closed")).run(self.conn)
 				x = []
 				y = []
 				icont = 0
 				for d in cur:
 					timeData = parser.parse(d["date"])
-					y.append(float(d["sensors"][self.numCanal]["value"]))
-					x.append(self.timestamp(timeData))
-					icont += 1
+					if timeData > (dt.datetime.now(pytz.timezone('Europe/Madrid')) - delta):
+						y.append(float(d["sensors"][0]["value"]))
+						x.append(self.timestamp(timeData))
+						icont += 1
 				print "Ext Time selected", icont
 				self.curveExt = self.plot.plot()
-				self.curveExt.setData(x=x, y=y)
-
+				self.curveExt.setData(x=x, y=y, pen=QPen(QColor(200, 20, 25)))
 
 			if canal in ('hum', 'humedad', 'humidity'):
 				self.plot.setLabel('left', text='Humidity', units='%')
@@ -91,8 +91,6 @@ class Plotter(QObject):
 			if canal in ('co2', 'CO2'):
 				self.plot.setLabel('left', text='CO2', units='ppm')
 				self.plot.setYRange(0,2000)
-
-
 
 			self.plotDlg.totalLcd.display(icont)
 
