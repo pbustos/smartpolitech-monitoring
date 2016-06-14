@@ -29,19 +29,19 @@ from ui_plotdlg import Ui_PlotDlg
 
 plots = {}
 sensors = {}
-connData = {"host":"158.49.247.193", "port":"28015", "db":"SmartPoliTech", "auth_key":"smartpolitech2"}
-CURRENT = "024020cc-28df-4c48-aa93-52e7193c9570"
-CURRENT_TABLE = "D024020cc28df4c48aa9352e7193c9570"
-
+connData = {"host":"158.49.247.126", "port":"28015", "db":"smartpolitech", "auth_key":"smartpolitech2"}
+CURRENT = "UEXCC_INF_P00_AUL030_SEN001_THC"
+CURRENT_TABLE = "UEXCC_INF_P00_AUL030_SEN001_THC"
 
 class MainWindow(QMainWindow, Ui_MainWindow):
 	def __init__(self):
 		super(MainWindow, self).__init__()
 		self.setupUi(self)
 		global sensors, CURRENT_TABLE
-		self.conn = rdb.connect(host=connData["host"], port=connData["port"], db=connData["db"], auth_key=connData["auth_key"])
-		# Set a changefeed for "Dispositivos" with initial stete reading
-		devices = rdb.table("Dispositivos").run(self.conn)
+		#self.conn = rdb.connect(host=connData["host"], port=connData["port"], db=connData["db"], auth_key=connData["auth_key"])
+		self.conn = rdb.connect(host=connData["host"], port=connData["port"], db=connData["db"])
+		# Set a changefeed for "Dispositivos" with initial state reading
+		devices = rdb.table("devices").run(self.conn)
 		pp = pprint.PrettyPrinter(indent=4)
 
 		# Init the DB reader thread
@@ -49,22 +49,25 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 		self.reader.signalVal.connect(self.slotFromReader)
 		self.reader.start()
 
-		for device in devices:
+		for device in list(devices):
 			#if device["id"] == CURRENT:
 			ide = device["id"]
 			sensors[ide] = device
-			table = "D" + ide.replace("-", "")
-			sensors[ide]["table"] = table
+			#table = "D" + ide.replace("-", "")
+			#sensors[ide]["table"] = table
 			# Poner todos como OFF y hacer esto en background
-			if rdb.table(table).is_empty().run(self.conn) is False:
-				datos = rdb.table(table).max("date").run(self.conn)
-				sensors[ide]["canales"] = datos["sensors"]
+			if rdb.table(ide).is_empty().run(self.conn) is False:
+				datos = rdb.table(ide).max("created_at").run(self.conn)
+				sensors[ide]["canales"] = list()
+				for k,v in datos["data"].iteritems():
+					sensors[ide]["canales"].append({"name":k,"value":v})
 			sensors[ide]["timer"] = Timer(ide, 1000)
 			sensors[ide]["timer"].timeout.connect(self.slotCountDown)
-			secs = (dt.datetime.now(pytz.utc) - parser.parse(datos["date"])).total_seconds()
+			#secs = (dt.datetime.now(pytz.utc) - parser.parse(datos["created_at"])).total_seconds()
+			secs = (dt.datetime.now(pytz.utc) - datos["created_at"]).total_seconds()
 			sensors[ide]["updated"] = dt.timedelta(seconds=secs)
 			sensors[ide]["active"] = True
-			self.reader.addTable(ide, table)
+			self.reader.addTable(ide)
 
 		# print "Tree -----------------------"
 		# pp = pprint.PrettyPrinter(indent=4)
@@ -119,17 +122,17 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 		for s in sensors.values():
 			top = QTreeWidgetItem(self.treeWidget)
 			#name.setText(0, s["description"] + "   ( " + s["id"] + " )")
-			top.setText(1, s["description"])
+			top.setText(1, s["Description"])
 			if s["active"] is True:
 				top.setIcon(0, QIcon("icons/greenBall.png"))
 			else:
 				top.setIcon(0, QIcon("icons/redBall.png"))
 			child = QTreeWidgetItem(top)
 			child.setText(1, s["id"])
-			child = QTreeWidgetItem(top)
-			child.setText(1, s["type"])
-			child = QTreeWidgetItem(top)
-			child.setText(1, s["location"])
+			#child = QTreeWidgetItem(top)
+			#child.setText(1, s["type"])
+			#child = QTreeWidgetItem(top)
+			#child.setText(1, s["location"])
 
 	def createTable(self, tableView):
 		itera = 0
@@ -145,7 +148,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 				continue
 			tableView.setRowCount(itera + 1)
 			tableView.setSpan(itera, 0, 1, tableView.columnCount())
-			item = QTableWidgetItem(sensor["description"] + "   ( " + sensor["id"] + " )")
+			item = QTableWidgetItem(sensor["Description"] + "   ( " + sensor["id"] + " )")
 			item.setTextAlignment(Qt.AlignLeft)
 			font = QFont()
 			font.setPointSize(13)
@@ -171,15 +174,16 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 				tableView.setRowCount(itera + 1)
 
 				item = QTableWidgetItem(sensor["canales"][j]["name"])
+
 				item.setTextAlignment(Qt.AlignCenter)
 				tableView.setItem(itera, 0, item)
 
 				item = QTableWidgetItem("{:0>8}".format(sensor["updated"]).split('.', 1)[0])
 				item.setTextAlignment(Qt.AlignCenter)
 				if sensor["updated"].seconds < 600:
-				 	item.setForeground(QBrush(Qt.green))
+					item.setForeground(QBrush(Qt.green))
 				else:
-				 	item.setForeground(QBrush(Qt.red))
+					item.setForeground(QBrush(Qt.red))
 				tableView.setItem(itera, 1, item)
 
 				#Add position of counter
@@ -231,7 +235,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 			for c, pos in zip(s["canales"], range(len(s["canales"]))):
 				#Check if clicked row is on of the stored rows
 				if c["counterPos"][0] == row:
-					self.p = Plotter(self.conn, s, pos)
+					self.p = Plotter(self.conn, k, s, pos)
 					break
 
 	@Slot(str)

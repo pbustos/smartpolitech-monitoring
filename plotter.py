@@ -11,15 +11,15 @@ from dateutil import parser
 call("pyside-uic plotdlg.ui > ui_plotdlg.py", shell=True)
 from ui_plotdlg import Ui_PlotDlg
 
-
-CURRENT = "024020cc-28df-4c48-aa93-52e7193c9570"
-tempExtTable = "D1c1857087db041f9a9ee39de67a89cd2"
+CURRENT = "UEXCC_INF_P00_AUL030_SEN001_THC"
+tempExtTable = "UEXCC_INF_P00_AUL030_SEN001_THC"
 
 class Plotter(QObject):
-	def __init__(self, conn, sensor, numCanal):
+	def __init__(self, conn, ide, sensor, numCanal):
 		super(QObject, self).__init__()
 		self.conn = conn
 		self.sensor = sensor
+		self.ide = ide
 		self.numCanal = numCanal
 		pg.setConfigOptions(antialias=True)
 		self.dlg = QDialog()
@@ -52,37 +52,40 @@ class Plotter(QObject):
 		self.dayData()
 
 	def getPastData(self, delta):
-			cur = rdb.table(self.sensor["table"]).order_by("date").run(self.conn)
+			cur = rdb.table(self.ide).order_by("created_at").run(self.conn)
 			x = []
 			y = []
 			icont = 0
 			for d in cur:
-				timeData = parser.parse(d["date"])
+				timeData = d["created_at"]
 				if timeData > (dt.datetime.now(pytz.timezone('Europe/Madrid')) - delta):
 					x.append(self.timestamp(timeData))
-					y.append(float(d["sensors"][self.numCanal]["value"]))
+					#y.append(float(d["data"][self.numCanal]["value"]))
+					y.append(float(d["data"].items()[self.numCanal][1]))
+
 					icont += 1
 			print "selected", icont
 			self.curve.setData(x=x, y=y)
 			canal = self.sensor["canales"][self.numCanal]["name"]
+
 			if canal in ('temp', 'temperatura', 'temperature'):
 				self.plot.setLabel('left', text='Temperatura', units='ºC')
 				# Read external temperature and draw in the same grpah
-				cur = rdb.table(tempExtTable).order_by("date").run(self.conn)
+				cur = rdb.table(tempExtTable).order_by("created_at").run(self.conn)
 				#lag = dt.datetime.now(pytz.timezone('Europe/Madrid')) - delta
 				#cur = rdb.table(tempExtTable).filter(rdb.row['date'].during(rdb.now(), lag, left_bound="open", right_bound="closed")).run(self.conn)
 				x = []
 				y = []
 				icont = 0
 				for d in cur:
-					timeData = parser.parse(d["date"])
+					timeData = parser.parse(d["created_at"])
 					if timeData > (dt.datetime.now(pytz.timezone('Europe/Madrid')) - delta):
-						y.append(float(d["sensors"][0]["value"]))
+						y.append(float(d["data"][0]["value"]))
 						x.append(self.timestamp(timeData))
 						icont += 1
 				print "Ext Time selected", icont
 				self.curveExt = self.plot.plot()
-				self.curveExt.setData(x=x, y=y, pen=QPen(QColor(200, 20, 25)))
+				self.curveExt.setData(x=x, y=y, pen=QPen(QColor(50, 20, 250)))
 
 			if canal in ('hum', 'humedad', 'humidity'):
 				self.plot.setLabel('left', text='Humidity', units='%')

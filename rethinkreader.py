@@ -11,19 +11,23 @@ class RDBReader(QThread):
 		super(RDBReader, self).__init__()
 		self.sensors = sensors
 		rdb.set_loop_type('tornado')
-		self.conn = rdb.connect(host=connData["host"], port=connData["port"], db=connData["db"], auth_key=connData["auth_key"])
+		#self.conn = rdb.connect(host=connData["host"], port=connData["port"], db=connData["db"], auth_key=connData["auth_key"])
+		self.conn = rdb.connect(host=connData["host"], port=connData["port"], db=connData["db"])
 
-	def addTable(self, ident, table):
-		ioloop.IOLoop.current().add_callback(self.changes, self.conn, ident, table, self.sensors)
+	def addTable(self, ident):
+		ioloop.IOLoop.current().add_callback(self.changes, self.conn, ident, self.sensors)
 
 	@gen.coroutine
-	def changes(self, conn, ident, table, sensors):
+	def changes(self, conn, ident, sensors):
 		connection = yield conn
-		feed = yield rdb.table(table).changes().run(connection)
+		feed = yield rdb.table(ident).changes().run(connection)
 		while (yield feed.fetch_next()):
 			change = yield feed.next()
 			sensors[ident]["updated"] = dt.timedelta(seconds=0)
-			sensors[ident]["canales"] = change["new_val"]["sensors"]
+			sensors[ident]["canales"] = list()
+			#sensors[ident]["canales"] = change["new_val"]["data"]
+			for k,v in change["new_val"]["data"].iteritems():
+					sensors[ident]["canales"].append({"name": k, "value": v})
 			self.signalVal.emit(ident)
 
 	def run(self):
